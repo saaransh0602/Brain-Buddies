@@ -415,3 +415,4 @@ $('#editCourseForm').addEventListener('submit', (e)=>{
   bootstrap.Modal.getInstance($('#editCourseModal')).hide();
   renderInstructor(); renderCatalog();
 });
+
