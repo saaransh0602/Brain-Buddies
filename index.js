@@ -37,12 +37,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json()); // This is crucial to parse JSON bodies in POST requests
+app.use(errorHandler);
 
 // --- Import Routes ---
 // We will create these files next
