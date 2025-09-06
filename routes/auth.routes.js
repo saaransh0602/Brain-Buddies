@@ -1,3 +1,149 @@
+// routes/auth.routes.js
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User.model');
+const router = express.Router();
+const { body, validationResult } = require('express-validator');
+
+// POST /api/auth/signup - User registration
+router.post('/signup', [
+  // Validation rules
+  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
+  body('username').isLength({ min: 3 }).trim().withMessage('Username must be at least 3 characters long'),
+  body('role').isIn(['student', 'educator']).withMessage('Role must be either student or educator')
+], async (req, res) => {
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      // Format error messages to be more client-friendly
+      const errorMessages = errors.array().map(error => ({
+        field: error.param,
+        message: error.msg,
+        value: error.value
+      }));
+      return res.status(400).json({ 
+        message: 'Validation failed. Please check your input.', 
+        errors: errorMessages 
+      });
+    }
+
+    // 1. Get user input from the request body
+    const { username, email, password, role } = req.body;
+
+    // 2. Check if the user already exists
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }]
+    });
+    if (existingUser) {
+      return res.status(400).json({
+        message: 'User already exists with this email or username.'
+      });
+    }
+
+    // 3. Create a new user document
+    const newUser = new User({
+      username,
+      email,
+      password,
+      role
+    });
+
+    // 4. Save the new user to the database
+    const savedUser = await newUser.save();
+
+    // 5. Respond successfully
+    res.status(201).json({
+      message: 'User created successfully!',
+      user: {
+        id: savedUser._id,
+        username: savedUser.username,
+        email: savedUser.email,
+        role: savedUser.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ message: 'Internal server error during signup.' });
+  }
+});
+
+// POST /api/auth/login - User login
+router.post('/login', [
+  // Validation rules
+  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
+  body('password').exists().withMessage('Password is required')
+], async (req, res) => {
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(error => ({
+        field: error.param,
+        message: error.msg,
+        value: error.value
+      }));
+      return res.status(400).json({ 
+        message: 'Validation failed. Please check your input.', 
+        errors: errorMessages 
+      });
+    }
+
+    // 1. Get user input from request body
+    const { email, password } = req.body;
+
+    // 2. Find the user by email
+    const user = await User.findOne({ email });
+    
+    // 3. If user doesn't exist OR password is incorrect, return error
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    // 4. Use the method from the User model to check the password
+    const isPasswordCorrect = await user.isCorrectPassword(password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ message: 'Invalid email or password.' });
+    }
+
+    // 5. If we get here, login is successful!
+    // Create a payload for the JWT
+    const payload = {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role
+    };
+
+    // 6. Sign and generate a JWT token
+    const authToken = jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    // 7. Send the token and user info back to the client
+    res.status(200).json({
+      message: 'Login successful!',
+      authToken: authToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Internal server error during login.' });
+  }
+});
+
+module.exports = router;
+
 /*// routes/auth.routes.js - The Registration System
 const express = require('express');
 const User = require('../models/User.model'); // Import the User model
@@ -55,12 +201,27 @@ router.post('/login', (req, res) => {
 // Export the router so it can be used in index.js
 module.exports = router;*/
 
-// routes/auth.routes.js
+/*// routes/auth.routes.js
 const express = require('express');
 const jwt = require('jsonwebtoken'); // Import jwt
 const User = require('../models/User.model');
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
 
+// Add validation to signup route
+router.post('/signup', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 6 }),
+  body('username').isLength({ min: 3 }).trim()
+], async (req, res) => {
+  // Check for validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  
+  // ... rest of your signup logic
+});
 // ... (keep your existing signup route code above this line) ...
 
 // POST /api/auth/login - User login
@@ -123,4 +284,4 @@ router.post('/login', async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = router;*/
